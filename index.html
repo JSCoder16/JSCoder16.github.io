@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webworker testing!</title>
+</head>
+<body>
+    <canvas id = 'canv' width = '600' height = '600' style = 'border: 1px solid #000'></canvas>
+
+    <script>
+        // get the html element
+        const canvas = document.getElementById("canv");
+        const ctx = canvas.getContext("2d");
+
+        // web worker setup
+        const worker = new SharedWorker('worker.js');
+
+        worker.port.start(); // start the sharing
+        
+        // all the rest of the players
+        const players = {};
+        
+        const colors = ['red', 'green', 'blue', 'lime', 'pink', 'orange', 'purple'];
+        // player
+        const player = {
+            x: 100 + (Math.random() * 400) | 0,
+            y: 100 + (Math.random() * 400) | 0,
+            vx: 0,
+            vy: 0,
+            id: 0,
+            col: colors[(Math.random() * colors.length) | 0]
+        };
+
+        worker.port.onmessage = (message) => {
+            let data = message.data;
+            if(data.id == 'position') {
+                players[data.pos.id] = data.pos;
+            }
+            if(data.id == 'id') {
+                player.id = data.new_id;
+            }
+        }
+        
+        // key input handler
+        const keys = {};
+
+        // update loop
+        window.setInterval(() => {
+            ctx.clearRect(0, 0, 600, 600);
+
+            // acceleration, friction and key input
+            let ax = 0, ay = 0;
+            if(keys.KeyW) {
+                ay -= 0.5;
+            }
+            if(keys.KeyS) {
+                ay += 0.5;
+            }
+            if(keys.KeyA) {
+                ax -= 0.5;
+            }
+            if(keys.KeyD) {
+                ax += 0.5;
+            }
+            player.vx *= 0.9;
+            player.vy *= 0.9;
+            player.vx += ax;
+            player.vy += ay;
+
+            player.x += player.vx;
+            player.y += player.vy;
+
+            for(let i in players) {
+                ctx.fillStyle = players[i].col;
+                ctx.fillRect(players[i].x - 10, players[i].y - 10, 20, 20);
+            }
+            
+            // broadcast position
+            worker.port.postMessage({x: player.x, y: player.y, id: player.id, col: player.col });
+        }, 1000 / 30);
+        
+        // key events
+        document.onkeydown = (evt) => {
+            keys[evt.code] = true;
+        } 
+        document.onkeyup = (evt) => {
+            keys[evt.code] = false;
+        } 
+
+    </script>
+</body>
+</html>
